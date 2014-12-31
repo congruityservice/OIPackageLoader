@@ -23,7 +23,7 @@ Function CS_GIT(inMethod, Param1, Param2, Param3, Param4, outValue,outStat)
 * Declare System Routines
 *
 Declare Subroutine Rlist, Write_Row
-Declare Function Xlate, Assigned, Oconv, Get_Property, ShellExecute
+Declare Function Xlate, Assigned, Oconv, Get_Property, ShellExecute, DCount
 
 *
 * Declare Application Routines
@@ -55,6 +55,8 @@ Begin Case
 	Case Method _eqc 'DecodeFileName' ; Gosub DecodeFileName
 	Case Method _eqc 'encodeRec' ; Gosub EncodeRec
 	Case Method _eqc 'DecodeRec' ; Gosub DecodeRec
+	Case Method _eqc 'getVersion' ; RetVal = '0.4.0'
+	
 
 	Case Otherwise$
 	* There is no otherwise case
