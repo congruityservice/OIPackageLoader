@@ -1,4 +1,3 @@
 Subroutine CS_MODULE_HELLOWORLD(params)
-Call Msg("Hello, World")
-Return 0
+Call Msg("Hello, World. Version 1")
 End
