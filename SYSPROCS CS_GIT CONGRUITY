@@ -1,0 +1,235 @@
+Function CS_GIT(inMethod, Param1, Param2, Param3, Param4, outValue,outStat)
+/************************************************************************************************
+*
+* Description:  
+*				
+*
+* Parameters:
+*   inMethod      - [IN] 
+*   Param1		  - [IN] Depends on inMethod
+	...
+*   Param4		  - [IN] Depends on inMethod
+*	outValue	  - [OUT] Unused
+*	outStat		  - [OUT] Unused
+*
+* Usage: RUN 
+	CS_GIT COMMIT, REPOSNAME
+*
+* History (Date, Initials, Notes)
+* 09/05/14    JAB    Original programmer
+*
+************************************************************************************************/
+*
+* Declare System Routines
+*
+Declare Subroutine Rlist, Write_Row
+Declare Function Xlate, Assigned, Oconv, Get_Property, ShellExecute
+
+*
+* Declare Application Routines
+*
+Declare Function CS_GIT
+
+Equ TARGET_ACTIVELIST$ 	to 5
+Equ CSG.REPOSPATH$ To 1
+Equ CSG.TRACKEDRECORDS$ To 5
+
+$Insert logical
+
+method = If Assigned(inMethod) And inMethod NE '' Then inMethod Else ''
+p1 = If Assigned(Param1) Then Param1 Else ''
+p2 = If Assigned(Param2) Then Param2 Else ''
+p3 = If Assigned(Param3) Then Param3 Else ''
+p4 = If Assigned(Param4) Then Param4 Else ''
+
+RetVal = ''
+*
+*Main case branch
+*
+Begin Case
+	
+	Case Method _eqc 'commit'  ; Gosub doCommit
+	Case Method _eqc 'export'  ; Gosub doExport
+	Case Method _eqc 'getSettings' ; Gosub getSettingsRec
+	Case Method _eqc 'encodeFileName' ; Gosub EncodeFileName
+	Case Method _eqc 'DecodeFileName' ; Gosub DecodeFileName
+	Case Method _eqc 'encodeRec' ; Gosub EncodeRec
+	Case Method _eqc 'DecodeRec' ; Gosub DecodeRec
+
+	Case Otherwise$
+	* There is no otherwise case
+	Goto End
+End Case
+
+End:
+Return RetVal
+
+*
+*End of the main branch
+*
+
+getSettingsRec:
+	ReposName = p1
+	
+	CurrentAppName = @APPID<1>
+	
+	*APPNAME*REPO*REPONAME*CS_GIT
+	ReposKey = CurrentAppName : "*REPO*" : ReposName : "*CS_GIT"
+	
+	ReposSettings = Xlate("SYSENV", ReposKey,"", "X")
+	
+	RetVal = ReposSettings
+Return
+
+DoExport:
+
+	ReposName = p1
+	
+	ReposSettings = CS_GIT("getSettings", ReposName)
+	
+	TrackedRecKeys = ReposSettings<CSG.TRACKEDRECORDS$>
+	
+	Swap @VM With @FM In TrackedRecKeys
+	TrackedRecKeysCount = DCOUNT(TrackedRecKeys, @FM)
+	
+	For i = 1 To TrackedReckeysCount
+		
+		ThisItem = TrackedReckeys<i>
+		
+		*Read the table name from the table*key string
+		ThisTable = ThisItem[1,'*']
+		*Read the key value from the table*key string. +2 for * delim and offset.
+		ThisKey = ThisItem[Len(ThisTable) + 2,Len(ThisItem)]
+		
+		ThisRec = Xlate(ThisTable, ThisKey, "", "X")
+		
+		If ThisRec NE "" Then
+		
+			ThisFileName = CS_GIT("encodeFileName", ThisItem)
+			ThisRec = CS_GIT("encodeRec", ThisRec)
+			OSWrite ThisRec To ReposSettings<CSG.REPOSPATH$> : "\" : ThisFileName
+			
+		End
+		
+	Next
+
+Return
+
+doCommit:
+
+	ReposName = p1
+	CommitMsg = p2
+	
+	ReposSettings = CS_GIT("getSettings", ReposName)
+	
+	Call CS_GIT('export', ReposName)
+	
+	pseProgram = "C:\Program Files\Git\bin\git.exe"
+	pseWorkingDir = ReposSettings<CSG.REPOSPATH$>
+	
+	*Add all new files to the repos
+	pseArgs = "add -A"
+	Gosub privShellExecute
+	
+	*Update changed files
+	pseArgs = "add -u"
+	Gosub privShellExecute
+	
+	*Update changed files
+	If CommitMsg NE "" Then
+		pseArgs = 'commit -m "' : CommitMsg: '"'
+		debug
+	End Else
+		pseArgs = 'commit -m "Auto commit ' : TimeDate(): '"'
+	End
+	
+	Gosub privShellExecute
+	
+	*Update changed files
+	pseArgs = 'push'
+	*Gosub privShellExecute
+	
+Return
+*
+* DoCommit End
+*
+
+privShellExecute:
+
+	Declare Function RTI_WINAPI_ShellExecuteEx
+
+	hwnd=get_Property( @window, "HANDLE" )
+	lpOperation="open" : \00\
+	lpFile=pseprogram : \00\ ; * pdf
+	lpParameters=pseargs:\00\
+
+	lpDirectory=pseWorkingDir : \00\
+	nShowCmd=1
+	privShellExecute=RTI_WINAPI_ShellExecuteEx( hwnd, lpOperation, lpFile, lpParameters, lpDirectory, nShowCmd )
+	
+Return
+
+*
+*
+*
+EncodeFileName:
+	FileName = p1
+	
+	ProtectChar = " "
+	Swap ProtectChar With "%" : Seq(ProtectChar) In FileName
+	
+	Swap "*" With " " In FileName
+	
+	RetVal = FileName
+Return
+*
+*
+*
+
+*
+*
+*
+DecodeFileName:
+	FileName = p1
+	
+	Swap " " With "*" In FileName
+	
+	ProtectChar = " "
+	Swap "%" : Seq(ProtectChar) With ProtectChar In FileName
+	
+	RetVal = FileName
+Return
+*
+*
+*
+
+*
+*
+*
+EncodeRec:
+	Rec = p1
+	
+	ProtectChar = @FM 
+	Swap ProtectChar With Char(13):Char(10) In Rec
+	
+	RetVal = Rec
+Return
+*
+*
+*
+
+*
+*
+*
+DecodeRec:
+	Rec = p1
+	
+	ProtectChar = @FM 
+	Swap Char(13):Char(10) With ProtectChar In Rec
+	
+	RetVal = Rec
+Return
+
+*
+* End CS_GIT
+*
